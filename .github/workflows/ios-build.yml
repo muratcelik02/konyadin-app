@@ -30,13 +30,31 @@ jobs:
       - name: Bağımlılıklar
         run: flutter pub get
 
+      # flutter build ios --no-codesign yeni Xcode sürümlerinde yine de Team istiyor;
+      # yalnızca yapılandırmayı Flutter'a bırakıp derlemeyi imzalama kapalı xcodebuild ile yap.
+      - name: Xcode yapılandırması
+        run: |
+          flutter build ios --release --no-codesign --config-only
+          if [ ! -d ios/Pods ]; then (cd ios && pod install); fi
+
       - name: Derle (imzasız)
-        run: flutter build ios --release --no-codesign
+        run: |
+          xcodebuild build \
+            -workspace ios/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build/xc \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM=""
 
       - name: IPA paketle
         run: |
           mkdir -p Payload
-          cp -R build/ios/iphoneos/Runner.app Payload/
+          cp -R build/xc/Build/Products/Release-iphoneos/Runner.app Payload/
           zip -qr klasorum.ipa Payload
 
       - uses: actions/upload-artifact@v4
