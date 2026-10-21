@@ -1,0 +1,14 @@
+.dart_tool/
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
+build/
+Payload/
+*.ipa
+*.apk
+.env
+.env.*
+ios/Pods/
+ios/.symlinks/
+.idea/
+.vscode/

@@ -1,0 +1,46 @@
+# iOS için imzasız .ipa derler (Mac gerektirmez).
+# Çıkan dosya Windows'ta Sideloadly ile Apple ID'nizle imzalanıp iPhone'a kurulur.
+name: iOS IPA
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      # Repoda yalnızca Info.plist var; eksik Xcode proje dosyalarını üret,
+      # kamera izinlerini içeren kendi Info.plist dosyamızı koru.
+      - name: iOS proje dosyalarını oluştur
+        run: |
+          cp ios/Runner/Info.plist /tmp/Info.plist
+          flutter create --platforms=ios --org com.muratcelik --project-name klasorum .
+          cp /tmp/Info.plist ios/Runner/Info.plist
+
+      - name: Bağımlılıklar
+        run: flutter pub get
+
+      - name: Derle (imzasız)
+        run: flutter build ios --release --no-codesign
+
+      - name: IPA paketle
+        run: |
+          mkdir -p Payload
+          cp -R build/ios/iphoneos/Runner.app Payload/
+          zip -qr klasorum.ipa Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: klasorum-ipa
+          path: klasorum.ipa
+          retention-days: 14
