@@ -38,9 +38,7 @@ class StatusIndicator extends StatelessWidget {
         decoration: BoxDecoration(
           color: color.withOpacity(0.12),
           borderRadius: BorderRadius.circular(20),
-          border: Border.pad(
-            BorderSide(color: color.withOpacity(0.4), width: 1),
-          ),
+          border: Border.all(color: color.withOpacity(0.4), width: 1),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,

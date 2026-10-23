@@ -30,6 +30,10 @@ jobs:
       - name: Bağımlılıklar
         run: flutter pub get
 
+      # Dart derleme hatalarını Xcode'a gelmeden, hepsini birden listele.
+      - name: Kod analizi
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings lib
+
       # flutter build ios --no-codesign yeni Xcode sürümlerinde yine de Team istiyor;
       # yalnızca yapılandırmayı Flutter'a bırakıp derlemeyi imzalama kapalı xcodebuild ile yap.
       - name: Xcode yapılandırması
