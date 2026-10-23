@@ -35,7 +35,9 @@ jobs:
       - name: Xcode yapılandırması
         run: |
           flutter build ios --release --no-codesign --config-only
-          if [ ! -d ios/Pods ]; then (cd ios && pod install); fi
+          # Yeni Flutter sürümleri Swift Package Manager kullanır ve Podfile üretmez;
+          # pod install yalnızca CocoaPods kullanılıyorsa gerekir.
+          if [ -f ios/Podfile ] && [ ! -d ios/Pods ]; then (cd ios && pod install); fi
 
       - name: Derle (imzasız)
         run: |
