@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../controllers/collection_controller.dart';
-import 'home_screen.dart';
 
 class SuccessScreen extends StatelessWidget {
   final CollectionController controller;
@@ -23,10 +22,7 @@ class SuccessScreen extends StatelessWidget {
     return PopScope(
       canPop: false,
       onPopInvoked: (_) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => HomeScreen(controller: controller)),
-          (route) => false,
-        );
+        Navigator.of(context).popUntil((route) => route.isFirst);
       },
       child: Scaffold(
         body: SafeArea(
@@ -129,12 +125,7 @@ class SuccessScreen extends StatelessWidget {
                 // Ana Ekrana Dön Butonu
                 ElevatedButton.icon(
                   onPressed: () {
-                    Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(
-                        builder: (_) => HomeScreen(controller: controller),
-                      ),
-                      (route) => false,
-                    );
+                    Navigator.of(context).popUntil((route) => route.isFirst);
                   },
                   icon: const Icon(Icons.home),
                   label: const Text('Ana Ekrana Dön'),

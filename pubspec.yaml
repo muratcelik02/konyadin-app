@@ -15,6 +15,8 @@ dependencies:
   path_provider: ^2.1.4
   path: ^1.9.0
   uuid: ^4.5.1
+  pdf: ^3.11.1
+  printing: ^5.13.4
 
 dev_dependencies:
   flutter_test:
@@ -23,3 +25,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    # PDF raporunda Türkçe karakterler için (DejaVu lisansı: assets/fonts/LICENSE-DejaVu.txt)
+    - assets/fonts/DejaVuSansCondensed.ttf
+    - assets/fonts/DejaVuSansCondensed-Bold.ttf

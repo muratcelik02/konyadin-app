@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../controllers/collection_controller.dart';
+import '../report/report_store.dart';
+import '../report/screens/report_jobs_screen.dart';
 import '../widgets/status_indicator.dart';
 import 'folder_name_screen.dart';
 import 'camera_screen.dart';
@@ -7,8 +9,9 @@ import 'settings_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   final CollectionController controller;
+  final ReportStore reportStore;
 
-  const HomeScreen({super.key, required this.controller});
+  const HomeScreen({super.key, required this.controller, required this.reportStore});
 
   void _onStart(BuildContext context) {
     // Eğer yarım kalan taslak varsa doğrudan kamera ekranına veya isim ekranına yönlendirebiliriz
@@ -160,6 +163,21 @@ class HomeScreen extends StatelessWidget {
                           ),
                         ),
                       ],
+                    ),
+                  ),
+
+                  // Periyodik Kontrol Raporları (çevrimdışı çalışır, sunucu gerektirmez)
+                  const SizedBox(height: 16),
+                  Card(
+                    child: ListTile(
+                      leading: const Icon(Icons.electrical_services, color: Color(0xFF1E5BB0)),
+                      title: const Text('Periyodik Kontrol Raporları',
+                          style: TextStyle(fontWeight: FontWeight.w700)),
+                      subtitle: const Text('Pano gözle kontrol ve fonksiyon test raporu hazırla, PDF al'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => ReportJobsScreen(store: reportStore)),
+                      ),
                     ),
                   ),
 
