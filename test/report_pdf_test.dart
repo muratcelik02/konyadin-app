@@ -198,7 +198,10 @@ void photoTests() {
     expect(await store.readMedia(report.equipmentPhotoPath), isNotNull);
     final withPhotos = await buildReportPdf(job: job, report: report, store: store);
     final without = await buildReportPdf(job: sampleJob(), report: sampleJob().reports.single, store: store);
-    expect(withPhotos.length, greaterThan(without.length));
+    // Gömülü resim sayısı: seçilen bant + 2 fotoğraf; fotoğrafsız raporda yalnız varsayılan bant.
+    int images(List<int> pdf) => RegExp(r'/Subtype\s*/Image').allMatches(latin1.decode(pdf)).length;
+    expect(images(without), greaterThanOrEqualTo(1));
+    expect(images(withPhotos), greaterThan(images(without)));
     await File('build/test_report_foto.pdf').writeAsBytes(withPhotos);
 
     // Kayıt diskten geri okunur.

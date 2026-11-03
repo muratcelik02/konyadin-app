@@ -26,6 +26,11 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    # PDF raporunda Türkçe karakterler için (DejaVu lisansı: assets/fonts/LICENSE-DejaVu.txt)
+    # PDF raporu: Carlito (Calibri uyumlu, OFL) ana yazı tipi, DejaVu sembol yedeği.
+    # Lisanslar: assets/fonts/LICENSE-Carlito.txt, assets/fonts/LICENSE-DejaVu.txt
+    - assets/fonts/Carlito-Regular.ttf
+    - assets/fonts/Carlito-Bold.ttf
     - assets/fonts/DejaVuSansCondensed.ttf
     - assets/fonts/DejaVuSansCondensed-Bold.ttf
+    # Word şablonundaki başlık bandı (görev ayarlarından değiştirilebilir)
+    - assets/report/header_banner.jpg

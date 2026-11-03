@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
@@ -8,6 +9,7 @@ import 'report_store.dart';
 import 'report_template.dart';
 
 const _border = 0.5;
+const _pageMarginX = 28.0;
 const _small = 6.5;
 const _normal = 7.5;
 const _headerFill = PdfColor.fromInt(0xFFD9E2F3);
@@ -21,8 +23,14 @@ Future<Uint8List> buildReportPdf({
   required PanelReport report,
   required ReportStore store,
 }) async {
-  final base = pw.Font.ttf(await rootBundle.load('assets/fonts/DejaVuSansCondensed.ttf'));
-  final bold = pw.Font.ttf(await rootBundle.load('assets/fonts/DejaVuSansCondensed-Bold.ttf'));
+  // Carlito, Word şablonundaki Calibri ile aynı ölçülerde açık lisanslı bir yazı tipidir.
+  // Carlito'da olmayan semboller (● ○ Ω Δ ≤) için DejaVu yedek olarak kullanılır.
+  final base = pw.Font.ttf(await rootBundle.load('assets/fonts/Carlito-Regular.ttf'));
+  final bold = pw.Font.ttf(await rootBundle.load('assets/fonts/Carlito-Bold.ttf'));
+  final fallback = [
+    pw.Font.ttf(await rootBundle.load('assets/fonts/DejaVuSansCondensed.ttf')),
+    pw.Font.ttf(await rootBundle.load('assets/fonts/DejaVuSansCondensed-Bold.ttf')),
+  ];
   final profile = job.profile;
 
   Future<pw.MemoryImage?> image(String? path) async {
@@ -30,7 +38,9 @@ Future<Uint8List> buildReportPdf({
     return bytes == null ? null : pw.MemoryImage(bytes);
   }
 
-  final logo = await image(profile.logoPath);
+  // Başlık bandı: görev ayarlarında seçilen resim, yoksa Word şablonundaki bant.
+  final banner = await image(profile.logoPath) ??
+      pw.MemoryImage((await rootBundle.load('assets/report/header_banner.jpg')).buffer.asUint8List());
   final equipmentPhoto = await image(report.equipmentPhotoPath);
   final thermalPhoto = await image(report.thermalPhotoPath);
   final isDraft = missingFields(report).isNotEmpty;
@@ -45,9 +55,9 @@ Future<Uint8List> buildReportPdf({
     pw.MultiPage(
       pageTheme: pw.PageTheme(
         pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.fromLTRB(28, 20, 28, 20),
-        theme: pw.ThemeData.withFont(base: base, bold: bold).copyWith(
-          defaultTextStyle: pw.TextStyle(font: base, fontBold: bold, fontSize: _normal),
+        margin: const pw.EdgeInsets.fromLTRB(_pageMarginX, 12, _pageMarginX, 16),
+        theme: pw.ThemeData.withFont(base: base, bold: bold, fontFallback: fallback).copyWith(
+          defaultTextStyle: pw.TextStyle(font: base, fontBold: bold, fontFallback: fallback, fontSize: _normal),
         ),
         buildForeground: isDraft
             ? (ctx) => pw.Watermark.text(
@@ -56,7 +66,7 @@ Future<Uint8List> buildReportPdf({
                 )
             : null,
       ),
-      header: (ctx) => _header(logo),
+      header: (ctx) => _header(banner),
       footer: (ctx) => _footer(ctx, profile, report),
       build: (ctx) => [
         ..._firmaBilgileri(profile, report),
@@ -91,36 +101,65 @@ Future<Uint8List> buildReportPdf({
 
 // ---------- Ortak parçalar ----------
 
-pw.Widget _header(pw.MemoryImage? logo) => pw.Container(
-      margin: const pw.EdgeInsets.only(bottom: 6),
-      padding: const pw.EdgeInsets.only(bottom: 4),
-      decoration: const pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide(width: _border))),
-      child: pw.Row(children: [
-        pw.SizedBox(width: 90, height: 34, child: logo == null ? null : pw.Image(logo, fit: pw.BoxFit.contain)),
-        pw.Expanded(
-          child: pw.Column(children: [
+/// Word şablonundaki başlık: tam genişlik bant (solda logo, sağda firma iletişim bilgileri),
+/// ilk iki başlık satırı bandın ortasında, "Periyodik Kontrol Raporu" hemen altında.
+pw.Widget _header(pw.MemoryImage banner) {
+  // Bant sayfa genişliğine yayılır; yüksekliği resmin kendi oranından gelir (kare bir logo
+  // seçilirse başlık sayfayı kaplamasın diye en fazla 80 pt).
+  final width = PdfPageFormat.a4.width - _pageMarginX * 2;
+  final ratio = (banner.width ?? 1936) / (banner.height ?? 204);
+  return pw.Padding(
+    padding: const pw.EdgeInsets.only(bottom: 4),
+    child: pw.Column(children: [
+      pw.Stack(alignment: pw.Alignment.center, children: [
+        pw.SizedBox(width: width, height: math.min(width / ratio, 80), child: pw.Image(banner, fit: pw.BoxFit.contain)),
+        pw.Padding(
+          padding: const pw.EdgeInsets.only(top: 10),
+          child: pw.Column(mainAxisSize: pw.MainAxisSize.min, children: [
             pw.Text(ReportTemplate.headerLine1,
-                style: const pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                style: const pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 15.5)),
+            pw.SizedBox(height: 2),
             pw.Text(ReportTemplate.headerLine2,
-                style: const pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
-            pw.Text(ReportTemplate.headerLine3, style: const pw.TextStyle(fontSize: 9)),
+                style: const pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14.5)),
           ]),
         ),
-        pw.SizedBox(width: 90),
       ]),
-    );
+      pw.Text(ReportTemplate.headerLine3, style: const pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11.5)),
+    ]),
+  );
+}
 
+/// Word şablonundaki altbilgi: ilk sayfada yalnız "Paraf:", diğerlerinde rapor numarası;
+/// sağda şablondaki gibi "Sayfa <toplam> | <sayfa>".
 pw.Widget _footer(pw.Context ctx, SiteProfile profile, PanelReport report) => pw.Column(children: [
       pw.Text(
-        ReportTemplate.footerMetni(orDash(profile.kontrolFirmasiEkli)),
-        style: const pw.TextStyle(fontSize: 5.5),
+        ReportTemplate.footerMetni(isFilled(profile.kontrolFirmasiEkli)
+            ? profile.kontrolFirmasiEkli.trim()
+            : ReportTemplate.defaultKontrolFirmasiEkli),
+        style: const pw.TextStyle(fontSize: 7.5),
         textAlign: pw.TextAlign.justify,
       ),
-      pw.SizedBox(height: 2),
-      pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
-        pw.Text('Rapor No: ${orDash(report.reportNo)} - Paraf:', style: const pw.TextStyle(fontSize: _small)),
-        pw.Text('Sayfa ${ctx.pageNumber} / ${ctx.pagesCount}', style: const pw.TextStyle(fontSize: _small)),
-      ]),
+      pw.SizedBox(height: 4),
+      pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: pw.CrossAxisAlignment.end,
+        children: [
+          pw.Padding(
+            padding: const pw.EdgeInsets.only(left: 8),
+            child: pw.Text(
+              ctx.pageNumber == 1 ? 'Paraf:' : 'Rapor No: ${orDash(report.reportNo)} - Paraf:',
+              style: const pw.TextStyle(fontSize: 7.5),
+            ),
+          ),
+          pw.RichText(
+            text: pw.TextSpan(style: const pw.TextStyle(fontSize: 7.5), children: [
+              const pw.TextSpan(text: 'Sayfa '),
+              pw.TextSpan(text: '${ctx.pagesCount}', style: const pw.TextStyle(fontSize: 11)),
+              pw.TextSpan(text: ' | ${ctx.pageNumber}'),
+            ]),
+          ),
+        ],
+      ),
     ]);
 
 pw.Widget _sectionTitle(String text) => pw.Container(
@@ -294,13 +333,15 @@ List<pw.Widget> _cihazlar(String title, List<MeasuringDevice> devices) {
 
 List<pw.Widget> _kontrolKriterleri(PanelReport r) {
   String ev(String id) => r.criteria[id]?.label ?? '-';
-  final widgets = <pw.Widget>[
+  // Bölüm başlığı ilk kriter grubuyla aynı blokta: sayfa sonunda tek başına kalmaz.
+  final heading = <pw.Widget>[
     _sectionTitle('5. KONTROL KRİTERLERİ VE TESTLER'),
     _subTitle('TEST VE KONTROLLER'),
     ..._kvTable([
       ['Pano Adı/Ekipman Tanımlaması', orDash(r.panelName)],
     ]),
   ];
+  final widgets = <pw.Widget>[];
   for (final g in ReportTemplate.criteriaGroups) {
     final rows = <List<String?>>[];
     for (var i = 0; i < g.items.length; i += 2) {
@@ -316,7 +357,7 @@ List<pw.Widget> _kontrolKriterleri(PanelReport r) {
       rows.add(['Fotoğraf numarası', orDash(r.thermalPhotoNo), 'Fotoğraf tarihi', orDash(r.thermalPhotoDate)]);
     }
     // Grup başlığı tablosuyla birlikte kalsın: sayfa sonunda tek başına başlık kalmaz.
-    widgets.add(_keep([_subTitle(g.title), ..._kvTable(rows)]));
+    widgets.add(_keep([if (widgets.isEmpty) ...heading, _subTitle(g.title), ..._kvTable(rows)]));
   }
   return widgets;
 }

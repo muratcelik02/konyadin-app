@@ -229,6 +229,9 @@ class ReportTemplate {
       'Derhal düzeltici eylem gerekli. C2 - Potansiyel olarak tehlikeli - acil düzeltici eylem gerekli. C3 - '
       'İyileştirme önerilir. Bu rapor “Alçak Gerilim Topraklama Tesisatı Kontrol Raporu” ile birlikte geçerlidir.';
 
+  /// Görev ayarlarında kontrol firması boş bırakılırsa altbilgide kullanılır (Word şablonundaki firma).
+  static const String defaultKontrolFirmasiEkli = 'DİNAMİK MÜHENDİSLİK’in';
+
   // kontrolFirmasiEkli: firmanın ekli hali, örn. "DİNAMİK MÜHENDİSLİK’in" (Türkçe ek firmaya göre değişir).
   static String footerMetni(String kontrolFirmasiEkli) =>
       '“-”: Tespit edilemeyen bilgi anlamında kullanılmaktadır. Kusur derecesi “*” hafif kusurlu ve “**” ağır '

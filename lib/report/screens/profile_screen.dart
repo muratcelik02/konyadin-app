@@ -37,11 +37,18 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoSave {
     if (mounted) setState(() => _logo = f);
   }
 
+  /// Başlık bandı sayfa genişliğinde basıldığı için yüksek çözünürlükte tutulur.
   Future<void> _pickLogo() async {
-    final x = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 800);
+    final x = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 2000);
     if (x == null) return;
     p.logoPath = await store.importLogo(x);
     await _loadLogo();
+    changed();
+  }
+
+  void _resetLogo() {
+    p.logoPath = null;
+    setState(() => _logo = null);
     changed();
   }
 
@@ -192,20 +199,32 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoSave {
           ),
           SectionCard(
             title: 'Rapor Ayarları',
-            subtitle: 'Logo, rapor numarası, süre ve kural eşikleri',
+            subtitle: 'Başlık bandı, rapor numarası, süre ve kural eşikleri',
             children: [
+              const Text('Rapor başlık bandı', style: TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 6),
+              // Beyaz zeminli bant koyu temada da okunsun diye beyaz kutu içinde gösterilir.
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
+                child: _logo == null
+                    ? Image.asset('assets/report/header_banner.jpg', fit: BoxFit.contain)
+                    : Image.memory(_logo!, fit: BoxFit.contain),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _logo == null
+                    ? 'Varsayılan (Word şablonundaki bant). Başlık yazıları bandın ortasına basılır.'
+                    : 'Özel bant. En iyi sonuç için geniş, ortası boş bir resim kullanın (ör. 1936×204).',
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              const SizedBox(height: 8),
               Row(children: [
-                Container(
-                  width: 96,
-                  height: 48,
-                  decoration:
-                      BoxDecoration(border: Border.all(color: Colors.black12), borderRadius: BorderRadius.circular(8)),
-                  child: _logo == null ? const Icon(Icons.image_outlined) : Image.memory(_logo!, fit: BoxFit.contain),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton(onPressed: _pickLogo, child: const Text('Rapor logosu seç')),
-                ),
+                Expanded(child: OutlinedButton(onPressed: _pickLogo, child: const Text('Bandı değiştir'))),
+                if (_logo != null) ...[
+                  const SizedBox(width: 8),
+                  Expanded(child: OutlinedButton(onPressed: _resetLogo, child: const Text('Varsayılana dön'))),
+                ],
               ]),
               const SizedBox(height: 12),
               BoundTextField(
