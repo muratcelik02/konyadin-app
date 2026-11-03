@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../report_models.dart';
@@ -24,7 +24,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoSave {
   InspectionJob get job => widget.job;
   SiteProfile get p => job.profile;
 
-  File? _logo;
+  Uint8List? _logo;
 
   @override
   void initState() {
@@ -33,14 +33,14 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoSave {
   }
 
   Future<void> _loadLogo() async {
-    final f = await store.resolveMedia(p.logoPath);
+    final f = await store.readMedia(p.logoPath);
     if (mounted) setState(() => _logo = f);
   }
 
   Future<void> _pickLogo() async {
     final x = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 800);
     if (x == null) return;
-    p.logoPath = await store.importLogo(x.path);
+    p.logoPath = await store.importLogo(x);
     await _loadLogo();
     changed();
   }
@@ -200,7 +200,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutoSave {
                   height: 48,
                   decoration:
                       BoxDecoration(border: Border.all(color: Colors.black12), borderRadius: BorderRadius.circular(8)),
-                  child: _logo == null ? const Icon(Icons.image_outlined) : Image.file(_logo!, fit: BoxFit.contain),
+                  child: _logo == null ? const Icon(Icons.image_outlined) : Image.memory(_logo!, fit: BoxFit.contain),
                 ),
                 const SizedBox(width: 12),
                 Expanded(

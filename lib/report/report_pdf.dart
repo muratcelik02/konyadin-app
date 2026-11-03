@@ -10,8 +10,8 @@ import 'report_template.dart';
 const _border = 0.5;
 const _small = 6.5;
 const _normal = 7.5;
-final _headerFill = PdfColor.fromInt(0xFFD9E2F3);
-final _labelFill = PdfColor.fromInt(0xFFF2F2F2);
+const _headerFill = PdfColor.fromInt(0xFFD9E2F3);
+const _labelFill = PdfColor.fromInt(0xFFF2F2F2);
 
 /// Fonksiyon test tablosu sütun genişlikleri (oransal). Grup başlığı aynı oranları kullanır.
 const _colFlex = [16, 100, 26, 24, 32, 30, 34, 50, 36, 36, 34, 30, 30, 55];
@@ -26,8 +26,8 @@ Future<Uint8List> buildReportPdf({
   final profile = job.profile;
 
   Future<pw.MemoryImage?> image(String? path) async {
-    final f = await store.resolveMedia(path);
-    return f == null ? null : pw.MemoryImage(await f.readAsBytes());
+    final bytes = await store.readMedia(path);
+    return bytes == null ? null : pw.MemoryImage(bytes);
   }
 
   final logo = await image(profile.logoPath);
@@ -52,7 +52,7 @@ Future<Uint8List> buildReportPdf({
         buildForeground: isDraft
             ? (ctx) => pw.Watermark.text(
                   'TASLAK',
-                  style: pw.TextStyle(font: bold, fontSize: 90, color: PdfColor.fromInt(0x33CC0000)),
+                  style: pw.TextStyle(font: bold, fontSize: 90, color: const PdfColor.fromInt(0x33CC0000)),
                 )
             : null,
       ),
@@ -99,8 +99,10 @@ pw.Widget _header(pw.MemoryImage? logo) => pw.Container(
         pw.SizedBox(width: 90, height: 34, child: logo == null ? null : pw.Image(logo, fit: pw.BoxFit.contain)),
         pw.Expanded(
           child: pw.Column(children: [
-            pw.Text(ReportTemplate.headerLine1, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
-            pw.Text(ReportTemplate.headerLine2, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+            pw.Text(ReportTemplate.headerLine1,
+                style: const pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+            pw.Text(ReportTemplate.headerLine2,
+                style: const pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
             pw.Text(ReportTemplate.headerLine3, style: const pw.TextStyle(fontSize: 9)),
           ]),
         ),
@@ -126,14 +128,14 @@ pw.Widget _sectionTitle(String text) => pw.Container(
       margin: const pw.EdgeInsets.only(top: 6),
       padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2.5),
       decoration: pw.BoxDecoration(color: _headerFill, border: pw.Border.all(width: _border)),
-      child: pw.Text(text, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8.5)),
+      child: pw.Text(text, style: const pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8.5)),
     );
 
 pw.Widget _subTitle(String text) => pw.Container(
       width: double.infinity,
       padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       decoration: pw.BoxDecoration(color: _labelFill, border: pw.Border.all(width: _border)),
-      child: pw.Text(text, style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+      child: pw.Text(text, style: const pw.TextStyle(fontWeight: pw.FontWeight.bold)),
     );
 
 /// Başlık ve içeriği aynı sayfada tutar (sayfa sonunda yetim başlık kalmaz).
@@ -345,14 +347,14 @@ List<pw.Widget> _fonksiyonTestleri(SiteProfile p, PanelReport r) {
         height: 14,
         alignment: pw.Alignment.center,
         decoration: pw.BoxDecoration(color: _headerFill, border: pw.Border.all(width: _border)),
-        child: pw.Text(text, style: pw.TextStyle(fontSize: _small, fontWeight: pw.FontWeight.bold)),
+        child: pw.Text(text, style: const pw.TextStyle(fontSize: _small, fontWeight: pw.FontWeight.bold)),
       ),
     );
   }
 
   final rows = <pw.TableRow>[
     pw.TableRow(
-      decoration: pw.BoxDecoration(color: _headerFill),
+      decoration: const pw.BoxDecoration(color: _headerFill),
       repeat: true,
       children: [for (final h in headers) _cell(h, bold: true, size: 5.5, align: pw.TextAlign.center)],
     ),
@@ -434,7 +436,7 @@ List<pw.Widget> _fonksiyonTestleri(SiteProfile p, PanelReport r) {
       },
       children: [
         pw.TableRow(
-          decoration: pw.BoxDecoration(color: _labelFill),
+          decoration: const pw.BoxDecoration(color: _labelFill),
           children: [
             for (final h in [
               'No.',

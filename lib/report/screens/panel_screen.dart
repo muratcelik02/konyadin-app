@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../report_models.dart';
@@ -27,8 +27,8 @@ class _PanelScreenState extends State<PanelScreen> with AutoSave {
   PanelReport get r => widget.report;
   SiteProfile get profile => job.profile;
 
-  File? _equipmentPhoto;
-  File? _thermalPhoto;
+  Uint8List? _equipmentPhoto;
+  Uint8List? _thermalPhoto;
 
   @override
   void initState() {
@@ -37,8 +37,8 @@ class _PanelScreenState extends State<PanelScreen> with AutoSave {
   }
 
   Future<void> _loadPhotos() async {
-    final e = await store.resolveMedia(r.equipmentPhotoPath);
-    final t = await store.resolveMedia(r.thermalPhotoPath);
+    final e = await store.readMedia(r.equipmentPhotoPath);
+    final t = await store.readMedia(r.thermalPhotoPath);
     if (mounted) {
       setState(() {
         _equipmentPhoto = e;
@@ -72,9 +72,9 @@ class _PanelScreenState extends State<PanelScreen> with AutoSave {
       ),
     );
     if (source == null) return;
-    final x = await ImagePicker().pickImage(source: source, maxWidth: 1600, imageQuality: 80);
+    final x = await ImagePicker().pickImage(source: source, maxWidth: kIsWeb ? 1000 : 1600, imageQuality: 80);
     if (x == null) return;
-    final rel = await store.importMedia(job, x.path);
+    final rel = await store.importMedia(job, x);
     if (thermal) {
       await store.deleteMedia(r.thermalPhotoPath);
       r.thermalPhotoPath = rel;
@@ -332,7 +332,7 @@ class _PanelScreenState extends State<PanelScreen> with AutoSave {
   Widget _missingCard(List<String> missing) {
     if (missing.isEmpty) {
       return Card(
-        color: Colors.green.shade50,
+        color: Colors.green.withValues(alpha: 0.15),
         child: const ListTile(
           leading: Icon(Icons.check_circle, color: Colors.green),
           title: Text('Rapor tamamlandı'),
@@ -341,7 +341,7 @@ class _PanelScreenState extends State<PanelScreen> with AutoSave {
       );
     }
     return Card(
-      color: Colors.orange.shade50,
+      color: Colors.orange.withValues(alpha: 0.15),
       margin: const EdgeInsets.only(bottom: 10),
       child: ExpansionTile(
         leading: const Icon(Icons.warning_amber_rounded, color: Colors.orange),
@@ -518,12 +518,12 @@ class _PanelScreenState extends State<PanelScreen> with AutoSave {
     );
   }
 
-  Widget _photoSlot(String label, File? file, VoidCallback onPick) {
+  Widget _photoSlot(String label, Uint8List? file, VoidCallback onPick) {
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       if (file != null)
         ClipRRect(
           borderRadius: BorderRadius.circular(12),
-          child: Image.file(file, height: 200, fit: BoxFit.cover),
+          child: Image.memory(file, height: 200, fit: BoxFit.cover),
         ),
       const SizedBox(height: 8),
       OutlinedButton.icon(

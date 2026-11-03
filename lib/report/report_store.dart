@@ -1,45 +1,32 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import 'report_models.dart';
+import 'storage/report_storage.dart';
 
-/// Görevleri telefonda (çevrimdışı) JSON dosyaları olarak saklar.
-/// Her görev: <belgeler>/reports/<id>.json, fotoğrafları: <belgeler>/reports/<id>/media/.
+/// Görevleri çevrimdışı saklar (telefonda belge klasörü, web önizlemede tarayıcı deposu).
 /// Fotoğraf yolları göreli tutulur; iOS'ta uygulama klasörünün tam yolu güncellemelerde değişebilir.
 class ReportStore extends ChangeNotifier {
   final _uuid = const Uuid();
+  final ReportStorage _storage;
   List<InspectionJob> jobs = [];
   bool isLoading = false;
-  Directory? _docs;
 
-  /// docsDir yalnızca testler için; uygulamada telefonun belge klasörü kullanılır.
-  ReportStore({Directory? docsDir}) : _docs = docsDir;
-
-  Future<Directory> _docsDir() async => _docs ??= await getApplicationDocumentsDirectory();
-
-  Future<Directory> _reportsDir() async {
-    final dir = Directory(p.join((await _docsDir()).path, 'reports'));
-    if (!await dir.exists()) await dir.create(recursive: true);
-    return dir;
-  }
+  /// rootDir yalnızca testler için; uygulamada telefonun belge klasörü kullanılır.
+  ReportStore({String? rootDir}) : _storage = ReportStorage(rootDir: rootDir);
 
   Future<void> load() async {
     isLoading = true;
     notifyListeners();
     final loaded = <InspectionJob>[];
     try {
-      final dir = await _reportsDir();
-      await for (final entity in dir.list()) {
-        if (entity is File && entity.path.endsWith('.json')) {
-          try {
-            final map = jsonDecode(await entity.readAsString()) as Map<String, dynamic>;
-            loaded.add(InspectionJob.fromJson(map));
-          } catch (e) {
-            debugPrint('Görev okunamadı: ${entity.path}: $e');
-          }
+      for (final json in await _storage.readJobs()) {
+        try {
+          loaded.add(InspectionJob.fromJson(jsonDecode(json) as Map<String, dynamic>));
+        } catch (e) {
+          debugPrint('Görev okunamadı: $e');
         }
       }
     } finally {
@@ -52,12 +39,7 @@ class ReportStore extends ChangeNotifier {
 
   Future<void> save(InspectionJob job) async {
     job.updatedAt = DateTime.now();
-    final dir = await _reportsDir();
-    final file = File(p.join(dir.path, '${job.id}.json'));
-    // Önce geçici dosyaya yazıp sonra taşı: yazma yarıda kalırsa eski kayıt bozulmaz.
-    final tmp = File('${file.path}.tmp');
-    await tmp.writeAsString(jsonEncode(job.toJson()), flush: true);
-    await tmp.rename(file.path);
+    await _storage.writeJob(job.id, jsonEncode(job.toJson()));
     if (!jobs.contains(job)) jobs.insert(0, job);
     jobs.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     notifyListeners();
@@ -73,11 +55,7 @@ class ReportStore extends ChangeNotifier {
   }
 
   Future<void> deleteJob(InspectionJob job) async {
-    final dir = await _reportsDir();
-    final file = File(p.join(dir.path, '${job.id}.json'));
-    if (await file.exists()) await file.delete();
-    final media = Directory(p.join(dir.path, job.id));
-    if (await media.exists()) await media.delete(recursive: true);
+    await _storage.deleteJob(job.id);
     jobs.remove(job);
     notifyListeners();
   }
@@ -107,35 +85,27 @@ class ReportStore extends ChangeNotifier {
 
   static DateTime _roundToMinute(DateTime d) => DateTime(d.year, d.month, d.day, d.hour, d.minute);
 
-  /// Seçilen fotoğrafı görev klasörüne kopyalar ve göreli yolunu döner.
-  Future<String> importMedia(InspectionJob job, String sourcePath) async {
-    final dir = Directory(p.join((await _reportsDir()).path, job.id, 'media'));
-    if (!await dir.exists()) await dir.create(recursive: true);
-    final ext = p.extension(sourcePath).isEmpty ? '.jpg' : p.extension(sourcePath);
-    final name = '${_uuid.v4()}$ext';
-    await File(sourcePath).copy(p.join(dir.path, name));
-    return p.join('reports', job.id, 'media', name);
+  Future<String> _import(XFile source, String folder) async {
+    final ext = p.extension(source.name).isEmpty ? '.jpg' : p.extension(source.name).toLowerCase();
+    final path = '$folder/${_uuid.v4()}$ext';
+    await _storage.writeMedia(path, await source.readAsBytes());
+    return path;
   }
+
+  /// Seçilen fotoğrafı görevin medya klasörüne kopyalar ve göreli yolunu döner.
+  Future<String> importMedia(InspectionJob job, XFile source) => _import(source, 'reports/${job.id}/media');
 
   /// Logo görevden bağımsız klasörde tutulur; profili kopyalanan görevler aynı logoyu kullanır
   /// ve bir görev silinince logo kaybolmaz.
-  Future<String> importLogo(String sourcePath) async {
-    final dir = Directory(p.join((await _reportsDir()).path, 'logos'));
-    if (!await dir.exists()) await dir.create(recursive: true);
-    final ext = p.extension(sourcePath).isEmpty ? '.jpg' : p.extension(sourcePath);
-    final name = '${_uuid.v4()}$ext';
-    await File(sourcePath).copy(p.join(dir.path, name));
-    return p.join('reports', 'logos', name);
-  }
+  Future<String> importLogo(XFile source) => _import(source, 'reports/logos');
 
-  Future<File?> resolveMedia(String? relativePath) async {
+  Future<Uint8List?> readMedia(String? relativePath) async {
     if (relativePath == null || relativePath.isEmpty) return null;
-    final f = File(p.join((await _docsDir()).path, relativePath));
-    return await f.exists() ? f : null;
+    return _storage.readMedia(relativePath);
   }
 
   Future<void> deleteMedia(String? relativePath) async {
-    final f = await resolveMedia(relativePath);
-    if (f != null) await f.delete();
+    if (relativePath == null || relativePath.isEmpty) return;
+    await _storage.deleteMedia(relativePath);
   }
 }

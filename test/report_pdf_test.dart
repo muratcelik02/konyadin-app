@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart' hide Evaluation;
 import 'package:klasorum/report/report_models.dart';
 import 'package:klasorum/report/report_pdf.dart';
 import 'package:klasorum/report/report_rules.dart';
+import 'package:image_picker/image_picker.dart' show XFile;
 import 'package:klasorum/report/report_store.dart';
 import 'package:klasorum/report/report_template.dart';
 
@@ -182,31 +183,31 @@ void photoTests() {
   test('logo ve fotoğraflar kopyalanır, PDF\'e gömülür, görev silinince temizlenir', () async {
     final tmp = await Directory.systemTemp.createTemp('rapor_test');
     addTearDown(() => tmp.delete(recursive: true));
-    final store = ReportStore(docsDir: tmp);
+    final store = ReportStore(rootDir: tmp.path);
     final src = File('${tmp.path}/kaynak.png')..writeAsBytesSync(base64Decode(_pngBase64));
 
     final job = await store.createJob('TEST');
     job.profile = sampleJob().profile;
-    job.profile.logoPath = await store.importLogo(src.path);
+    job.profile.logoPath = await store.importLogo(XFile(src.path));
     final report = sampleJob().reports.single;
-    report.equipmentPhotoPath = await store.importMedia(job, src.path);
-    report.thermalPhotoPath = await store.importMedia(job, src.path);
+    report.equipmentPhotoPath = await store.importMedia(job, XFile(src.path));
+    report.thermalPhotoPath = await store.importMedia(job, XFile(src.path));
     job.reports.add(report);
     await store.save(job);
 
-    expect(await store.resolveMedia(report.equipmentPhotoPath), isNotNull);
+    expect(await store.readMedia(report.equipmentPhotoPath), isNotNull);
     final withPhotos = await buildReportPdf(job: job, report: report, store: store);
     final without = await buildReportPdf(job: sampleJob(), report: sampleJob().reports.single, store: store);
     expect(withPhotos.length, greaterThan(without.length));
     await File('build/test_report_foto.pdf').writeAsBytes(withPhotos);
 
     // Kayıt diskten geri okunur.
-    final reloaded = ReportStore(docsDir: tmp);
+    final reloaded = ReportStore(rootDir: tmp.path);
     await reloaded.load();
     expect(reloaded.jobs.single.reports.single.circuits.length, 77);
 
     await store.deleteJob(job);
-    expect(await store.resolveMedia(report.equipmentPhotoPath), isNull);
-    expect(await store.resolveMedia(job.profile.logoPath), isNotNull, reason: 'logo görevden bağımsız saklanır');
+    expect(await store.readMedia(report.equipmentPhotoPath), isNull);
+    expect(await store.readMedia(job.profile.logoPath), isNotNull, reason: 'logo görevden bağımsız saklanır');
   });
 }
