@@ -30,6 +30,7 @@ flutter:
     # Lisanslar: assets/fonts/LICENSE-Carlito.txt, assets/fonts/LICENSE-DejaVu.txt
     - assets/fonts/Carlito-Regular.ttf
     - assets/fonts/Carlito-Bold.ttf
+    - assets/fonts/Carlito-BoldItalic.ttf
     - assets/fonts/DejaVuSansCondensed.ttf
     - assets/fonts/DejaVuSansCondensed-Bold.ttf
     # Word şablonundaki başlık bandı (görev ayarlarından değiştirilebilir)

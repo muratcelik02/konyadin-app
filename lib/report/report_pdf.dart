@@ -8,15 +8,15 @@ import 'report_rules.dart';
 import 'report_store.dart';
 import 'report_template.dart';
 
-const _border = 0.5;
+// Word şablonundaki ölçüler: gövde 8 pt, bölüm başlıkları 9 pt, başlık zemini #D9D9D9.
+const _border = 0.6;
 const _pageMarginX = 28.0;
-const _small = 6.5;
-const _normal = 7.5;
-const _headerFill = PdfColor.fromInt(0xFFD9E2F3);
-const _labelFill = PdfColor.fromInt(0xFFF2F2F2);
+const _fs = 8.0;
+const _fsSmall = 7.0;
+const _titleFill = PdfColor.fromInt(0xFFD9D9D9);
 
 /// Fonksiyon test tablosu sütun genişlikleri (oransal). Grup başlığı aynı oranları kullanır.
-const _colFlex = [16, 100, 26, 24, 32, 30, 34, 50, 36, 36, 34, 30, 30, 55];
+const _colFlex = [16, 92, 24, 24, 34, 30, 34, 40, 38, 30, 38, 28, 28, 34];
 
 Future<Uint8List> buildReportPdf({
   required InspectionJob job,
@@ -27,6 +27,7 @@ Future<Uint8List> buildReportPdf({
   // Carlito'da olmayan semboller (● ○ Ω Δ ≤) için DejaVu yedek olarak kullanılır.
   final base = pw.Font.ttf(await rootBundle.load('assets/fonts/Carlito-Regular.ttf'));
   final bold = pw.Font.ttf(await rootBundle.load('assets/fonts/Carlito-Bold.ttf'));
+  final boldItalic = pw.Font.ttf(await rootBundle.load('assets/fonts/Carlito-BoldItalic.ttf'));
   final fallback = [
     pw.Font.ttf(await rootBundle.load('assets/fonts/DejaVuSansCondensed.ttf')),
     pw.Font.ttf(await rootBundle.load('assets/fonts/DejaVuSansCondensed-Bold.ttf')),
@@ -56,8 +57,14 @@ Future<Uint8List> buildReportPdf({
       pageTheme: pw.PageTheme(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.fromLTRB(_pageMarginX, 12, _pageMarginX, 16),
-        theme: pw.ThemeData.withFont(base: base, bold: bold, fontFallback: fallback).copyWith(
-          defaultTextStyle: pw.TextStyle(font: base, fontBold: bold, fontFallback: fallback, fontSize: _normal),
+        theme: pw.ThemeData.withFont(base: base, bold: bold, boldItalic: boldItalic, fontFallback: fallback).copyWith(
+          defaultTextStyle: pw.TextStyle(
+            font: base,
+            fontBold: bold,
+            fontBoldItalic: boldItalic,
+            fontFallback: fallback,
+            fontSize: _fs,
+          ),
         ),
         buildForeground: isDraft
             ? (ctx) => pw.Watermark.text(
@@ -75,23 +82,13 @@ Future<Uint8List> buildReportPdf({
         ..._cihazlar('4. ÖLÇÜM ALETLERİ BİLGİLERİ', profile.measuringDevices),
         ..._kontrolKriterleri(report),
         ..._fonksiyonTestleri(profile, report),
-        _keep([_sectionTitle('7. KUSUR AÇIKLAMALARI'), _box(pw.Text(orDash(report.defects)))]),
+        _keep([_sectionTitle('7. KUSUR AÇIKLAMALARI'), _box(pw.Text(report.defects.trim()), minHeight: 14)]),
         _keep([_sectionTitle('8. EKİPMAN FOTOĞRAFLARI'), _photos(report, equipmentPhoto, thermalPhoto)]),
         _keep([
           _sectionTitle('9. NOTLAR'),
           _box(pw.Text(ReportTemplate.notlar, textAlign: pw.TextAlign.justify)),
         ]),
-        _sectionTitle('10. SONUÇ VE KANAAT'),
-        _box(pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-          pw.Text(
-            ReportTemplate.sonucMetni(uygun: uygun, sonrakiTarih: formatDate(report.nextDate)),
-            style: pw.TextStyle(font: bold),
-            textAlign: pw.TextAlign.justify,
-          ),
-          pw.SizedBox(height: 3),
-          pw.Text(ReportTemplate.agirKusurTanimlari,
-              style: const pw.TextStyle(fontSize: _small), textAlign: pw.TextAlign.justify),
-        ])),
+        ..._sonuc(report, uygun),
         ..._yetkili(profile),
       ],
     ),
@@ -162,44 +159,67 @@ pw.Widget _footer(pw.Context ctx, SiteProfile profile, PanelReport report) => pw
       ),
     ]);
 
+/// Word'deki bölüm başlığı: gri zemin, kalın, altı çizili.
 pw.Widget _sectionTitle(String text) => pw.Container(
       width: double.infinity,
-      margin: const pw.EdgeInsets.only(top: 6),
-      padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2.5),
-      decoration: pw.BoxDecoration(color: _headerFill, border: pw.Border.all(width: _border)),
-      child: pw.Text(text, style: const pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8.5)),
+      margin: const pw.EdgeInsets.only(top: 5),
+      padding: const pw.EdgeInsets.symmetric(horizontal: 3, vertical: 1.5),
+      decoration: pw.BoxDecoration(color: _titleFill, border: pw.Border.all(width: _border)),
+      child: pw.Text(text,
+          style:
+              const pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9, decoration: pw.TextDecoration.underline)),
     );
 
-pw.Widget _subTitle(String text) => pw.Container(
+/// Word'deki alt başlık: ortalı, altı çizili; bazıları kalın.
+pw.Widget _subTitle(String text, {bool bold = true}) => pw.Container(
       width: double.infinity,
-      padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-      decoration: pw.BoxDecoration(color: _labelFill, border: pw.Border.all(width: _border)),
-      child: pw.Text(text, style: const pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+      padding: const pw.EdgeInsets.symmetric(horizontal: 3, vertical: 1.5),
+      decoration: pw.BoxDecoration(border: pw.Border.all(width: _border)),
+      child: pw.Text(text,
+          textAlign: pw.TextAlign.center,
+          style: pw.TextStyle(
+            fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
+            decoration: pw.TextDecoration.underline,
+          )),
     );
 
 /// Başlık ve içeriği aynı sayfada tutar (sayfa sonunda yetim başlık kalmaz).
 pw.Widget _keep(List<pw.Widget> children) =>
     pw.Inseparable(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: children));
 
-pw.Widget _box(pw.Widget child) => pw.Container(
+pw.Widget _box(pw.Widget child, {double? minHeight}) => pw.Container(
       width: double.infinity,
-      padding: const pw.EdgeInsets.all(4),
+      constraints: minHeight == null ? null : pw.BoxConstraints(minHeight: minHeight),
+      padding: const pw.EdgeInsets.symmetric(horizontal: 3, vertical: 2),
       decoration: pw.BoxDecoration(border: pw.Border.all(width: _border)),
       child: child,
     );
 
-pw.Widget _cell(String text, {bool bold = false, bool fill = false, double size = _normal, pw.TextAlign? align}) =>
-    pw.Container(
-      color: fill ? _labelFill : null,
-      padding: const pw.EdgeInsets.symmetric(horizontal: 3, vertical: 2),
+pw.Widget _cell(
+  String text, {
+  bool bold = false,
+  bool underline = false,
+  double size = _fs,
+  pw.TextAlign align = pw.TextAlign.left,
+}) =>
+    pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(horizontal: 3, vertical: 1.5),
       child: pw.Text(text,
           textAlign: align,
-          style: pw.TextStyle(fontSize: size, fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal)),
+          style: pw.TextStyle(
+            fontSize: size,
+            fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
+            decoration: underline ? pw.TextDecoration.underline : null,
+          )),
     );
 
+/// Word'deki değer hücresi: kalın, ortalı.
+pw.Widget _value(String text, {double size = _fs}) => _cell(text, bold: true, size: size, align: pw.TextAlign.center);
+
 /// Etiket | değer | etiket | değer satırları; iki elemanlı satır tek çift olarak tam genişlikte basılır.
+/// Word'deki gibi etiketler düz (labelBold ile kalın), değerler kalın ve ortalıdır.
 /// Aynı yapıdaki ardışık satırlar tek tabloda toplanır; tablolar sayfa sonunda satır satır bölünür.
-List<pw.Widget> _kvTable(List<List<String?>> rows) {
+List<pw.Widget> _kvTable(List<List<String?>> rows, {bool labelBold = false}) {
   final tables = <pw.Widget>[];
   var i = 0;
   while (i < rows.length) {
@@ -210,7 +230,7 @@ List<pw.Widget> _kvTable(List<List<String?>> rows) {
     }
     tables.add(pw.Table(
       border: pw.TableBorder.all(width: _border),
-      defaultVerticalAlignment: pw.TableCellVerticalAlignment.full,
+      defaultVerticalAlignment: pw.TableCellVerticalAlignment.middle,
       columnWidths: four
           ? const {
               0: pw.FlexColumnWidth(3),
@@ -222,9 +242,9 @@ List<pw.Widget> _kvTable(List<List<String?>> rows) {
       children: [
         for (final r in run)
           pw.TableRow(children: [
-            _cell(r[0]!, fill: true),
-            _cell(r[1] ?? '-'),
-            if (four) ...[_cell(r[2]!, fill: true), _cell(r[3] ?? '-')],
+            _cell(r[0]!, bold: labelBold),
+            _value(r[1] ?? '-'),
+            if (four) ...[_cell(r[2]!, bold: labelBold), _value(r[3] ?? '-')],
           ]),
       ],
     ));
@@ -232,15 +252,15 @@ List<pw.Widget> _kvTable(List<List<String?>> rows) {
   return tables;
 }
 
-/// Seçim alanını rapordaki gibi basar: ○EV●TİCARİ○ENDÜSTRİ
+/// Seçim alanını rapordaki gibi basar: ○EV   ●TİCARİ   ○ENDÜSTRİ
 String choiceText(ChoiceFieldDef def, List<String> selected) =>
-    def.options.map((o) => '${selected.contains(o) ? '●' : '○'}$o').join(' ');
+    def.options.map((o) => '${selected.contains(o) ? '●' : '○'}$o').join('   ');
 
 // ---------- Bölümler ----------
 
 List<pw.Widget> _firmaBilgileri(SiteProfile p, PanelReport r) => [
       _sectionTitle('1. FİRMA BİLGİLERİ'),
-      ..._kvTable([
+      ..._kvTable(labelBold: true, [
         ['Firma Adı', orDash(p.text('firmaAdi')), 'Rapor Numarası', orDash(r.reportNo)],
         ['Periyodik Kontrol Adresi', orDash(p.text('adres'))],
         [
@@ -258,7 +278,7 @@ List<pw.Widget> _firmaBilgileri(SiteProfile p, PanelReport r) => [
         ['Bir Sonraki Periyodik Kontrol Tarihi', formatDate(r.nextDate), 'Rapor Tarihi', formatDate(r.reportDate)],
       ]),
       _subTitle('PERİYODİK KONTROL METODU VE KAPSAMI'),
-      _box(pw.Text(ReportTemplate.kontrolKapsami, style: const pw.TextStyle(fontSize: _small))),
+      _box(pw.Text(ReportTemplate.kontrolKapsami, textAlign: pw.TextAlign.justify)),
     ];
 
 List<pw.Widget> _ekipmanBilgileri(SiteProfile p) {
@@ -275,29 +295,29 @@ List<pw.Widget> _ekipmanBilgileri(SiteProfile p) {
       ['Faz İletkenlerinin Sayısı ve Tipi', c(ReportTemplate.fazIletken)],
       ['Ekipmanın Kullanım Amacı', t('kullanimAmaci'), 'Şebeke Tipi', c(ReportTemplate.sebekeTipi)],
       [
-        'Sistem Topraklama İletkeni ve Kesiti (mm2)',
+        'Sistem Topraklama İletkeni ve Kesiti (mm²)',
         t('sistemTopraklama'),
         'İlave Topraklama Elektrodu Detayları',
         t('ilaveElektrot')
       ],
       [
-        'Ana Eşpotansiyel İletkeni ve Kesiti (mm2)',
+        'Ana Eşpotansiyel İletkeni ve Kesiti (mm²)',
         t('anaEspotansiyel'),
         'Temel Topraklama Direnci (Ω)',
         t('temelTopraklamaDirenci')
       ],
       [
-        'TT-TNS Şebeke İçin Ana RCD Test Akımı (mA) ve Test Süresi (ms)',
+        'TT-TNS Şebeke İçin Ana RCD (Artık Akım Anahtarı) Test Akımı (mA) ve Test Süresi (ms)',
         t('anaRcdTest'),
-        'TT-TNS Şebeke İçin Ana RCD Anma Akımı (A)',
+        'TT-TNS Şebeke İçin Ana RCD (Artık Akım Anahtarı) Anma Akımı (A)',
         t('anaRcdAnma'),
       ],
     ]),
-    _subTitle('Ana Kesici Karakteristikleri'),
+    _subTitle('Ana Kesici Karakteristikleri', bold: false),
     ..._kvTable([
       ['Nominal Akımı (A)', t('anaKesiciNominal'), 'Tipi', t('anaKesiciTipi')],
     ]),
-    _subTitle('Besleme Kaynağı Karakteristikleri'),
+    _subTitle('Besleme Kaynağı Karakteristikleri', bold: false),
     ..._kvTable([
       ['Nominal Gerilimi U/U0 (kV)', t('beslemeGerilim'), 'Nominal Frekansı f(1) (Hz)', t('beslemeFrekans')],
       ['Hata Akım Olasılığı IF (kA)', t('hataAkimi'), 'Dış Çevrim Empedansı ZE (Ω)', t('disCevrimEmpedansi')],
@@ -320,64 +340,94 @@ List<pw.Widget> _cihazlar(String title, List<MeasuringDevice> devices) {
   MeasuringDevice d(int i) => i < devices.length ? devices[i] : MeasuringDevice();
   final a = d(0), b = d(1);
   return [
-    _sectionTitle(title),
-    ..._kvTable([
-      ['Cihaz Adı', orDash(a.name), 'Cihaz Adı', orDash(b.name)],
-      ['Kalibrasyon Tarihi', orDash(a.calibrationDate), 'Kalibrasyon Tarihi', orDash(b.calibrationDate)],
-      ['Kalibrasyon Geçerlilik Tarihi', orDash(a.validity), 'Kalibrasyon Geçerlilik Tarihi', orDash(b.validity)],
-      ['Seri Numarası', orDash(a.serialNo), 'Seri Numarası', orDash(b.serialNo)],
-      ['Kalibrasyon Numarası', orDash(a.calibrationNo), 'Kalibrasyon Numarası', orDash(b.calibrationNo)],
+    _keep([
+      _sectionTitle(title),
+      ..._kvTable([
+        ['Cihaz Adı', orDash(a.name), 'Cihaz Adı', orDash(b.name)],
+        ['Kalibrasyon Tarihi', orDash(a.calibrationDate), 'Kalibrasyon Tarihi', orDash(b.calibrationDate)],
+        ['Kalibrasyon Geçerlilik Tarihi', orDash(a.validity), 'Kalibrasyon Geçerlilik Tarihi', orDash(b.validity)],
+        ['Seri Numarası', orDash(a.serialNo), 'Seri Numarası', orDash(b.serialNo)],
+        ['Kalibrasyon Numarası', orDash(a.calibrationNo), 'Kalibrasyon Numarası', orDash(b.calibrationNo)],
+      ]),
     ]),
   ];
 }
 
+/// Kontrol kriterleri tablosu: Word'deki gibi geniş kriter, dar değerlendirme sütunu.
+const _criteriaWidths = {
+  0: pw.FlexColumnWidth(7),
+  1: pw.FlexColumnWidth(3),
+  2: pw.FlexColumnWidth(7),
+  3: pw.FlexColumnWidth(3),
+};
+
+pw.Widget _criteriaTable(List<pw.TableRow> rows) => pw.Table(
+      border: pw.TableBorder.all(width: _border),
+      defaultVerticalAlignment: pw.TableCellVerticalAlignment.middle,
+      columnWidths: _criteriaWidths,
+      children: rows,
+    );
+
 List<pw.Widget> _kontrolKriterleri(PanelReport r) {
   String ev(String id) => r.criteria[id]?.label ?? '-';
-  // Bölüm başlığı ilk kriter grubuyla aynı blokta: sayfa sonunda tek başına kalmaz.
+  pw.TableRow pair(String l1, String v1, [String? l2, String? v2]) => pw.TableRow(children: [
+        _cell(l1),
+        _value(v1),
+        _cell(l2 ?? ''),
+        l2 == null ? pw.SizedBox() : _value(v2 ?? '-'),
+      ]);
+
+  // Bölüm başlığı, sütun başlıkları ve ilk kriter grubu aynı blokta: sayfa sonunda tek başına kalmaz.
   final heading = <pw.Widget>[
     _sectionTitle('5. KONTROL KRİTERLERİ VE TESTLER'),
     _subTitle('TEST VE KONTROLLER'),
-    ..._kvTable([
+    ..._kvTable(labelBold: true, [
       ['Pano Adı/Ekipman Tanımlaması', orDash(r.panelName)],
+    ]),
+    _criteriaTable([
+      pw.TableRow(children: [
+        for (final h in ['KONTROL KRİTERİ', 'DEĞERLENDİRME', 'KONTROL KRİTERİ', 'DEĞERLENDİRME'])
+          _cell(h, bold: true, underline: true, align: pw.TextAlign.center),
+      ]),
     ]),
   ];
   final widgets = <pw.Widget>[];
   for (final g in ReportTemplate.criteriaGroups) {
-    final rows = <List<String?>>[];
+    final rows = <pw.TableRow>[];
     for (var i = 0; i < g.items.length; i += 2) {
       final a = g.items[i];
-      if (i + 1 < g.items.length) {
-        final b = g.items[i + 1];
-        rows.add([a.label, ev(a.id), b.label, ev(b.id)]);
-      } else {
-        rows.add([a.label, ev(a.id)]);
-      }
+      final b = i + 1 < g.items.length ? g.items[i + 1] : null;
+      rows.add(pair(a.label, ev(a.id), b?.label, b == null ? null : ev(b.id)));
     }
     if (g.items.any((c) => c.id == 'asiriYuk')) {
-      rows.add(['Fotoğraf numarası', orDash(r.thermalPhotoNo), 'Fotoğraf tarihi', orDash(r.thermalPhotoDate)]);
+      rows.add(pair('Fotoğraf numarası', orDash(r.thermalPhotoNo), 'Fotoğraf tarihi', orDash(r.thermalPhotoDate)));
     }
-    // Grup başlığı tablosuyla birlikte kalsın: sayfa sonunda tek başına başlık kalmaz.
-    widgets.add(_keep([if (widgets.isEmpty) ...heading, _subTitle(g.title), ..._kvTable(rows)]));
+    widgets.add(_keep([
+      if (widgets.isEmpty) ...heading,
+      _subTitle(g.title, bold: false),
+      _criteriaTable(rows),
+    ]));
   }
   return widgets;
 }
 
 List<pw.Widget> _fonksiyonTestleri(SiteProfile p, PanelReport r) {
-  final headers = [
-    'No.',
-    'Pano/tablo numarası-linye adı-etiketi',
-    'Açma eğrisi tipi',
-    'Kutup sayısı',
-    'Kısa devre kesme akımı Icu (kA)',
-    'Nominal akım In (A)',
-    'Tasarım (yük) akımı Ib (A)',
-    'Faz kesiti (mm²)',
-    'PE koruma iletkeni kesiti (mm²)',
-    'N/PEN kesiti (mm²)',
-    'Akım taşıma kapasitesi (Iz) (A)',
-    'Açma akımı IΔ (mA)',
-    'Açma akımı TΔ (ms)',
-    'Sonuç (Not)',
+  // (başlık, altı çizili mi) — Word'de No., linye adı ve sonuç başlıkları altı çizili.
+  const headers = [
+    ('No.', true),
+    ('Pano/tablo numarası-linye adı-etiketi', true),
+    ('Açma eğrisi tipi', false),
+    ('Kutup sayısı', false),
+    ('Kısa devre kesme akımı Icu (kA)', false),
+    ('Nominal akım In (A)', false),
+    ('Tasarım (yük) akımı Ib (A)', false),
+    ('Faz kesiti (mm²)', false),
+    ('PE koruma iletkeni kesiti (mm²)', false),
+    ('N/PEN kesiti (mm²)', false),
+    ('Akım taşıma kapasitesi (Iz) (A)', false),
+    ('Açma akımı IΔ (mA)', false),
+    ('Açma akımı TΔ (ms)', false),
+    ('Sonuç (Not)', true),
   ];
 
   pw.Widget groupCell(String text, int fromCol, int toCol) {
@@ -385,19 +435,20 @@ List<pw.Widget> _fonksiyonTestleri(SiteProfile p, PanelReport r) {
     return pw.Expanded(
       flex: flex,
       child: pw.Container(
-        height: 14,
+        height: 12,
         alignment: pw.Alignment.center,
-        decoration: pw.BoxDecoration(color: _headerFill, border: pw.Border.all(width: _border)),
-        child: pw.Text(text, style: const pw.TextStyle(fontSize: _small, fontWeight: pw.FontWeight.bold)),
+        decoration: pw.BoxDecoration(border: pw.Border.all(width: _border)),
+        child: pw.Text(text, style: const pw.TextStyle(fontSize: _fsSmall, decoration: pw.TextDecoration.underline)),
       ),
     );
   }
 
   final rows = <pw.TableRow>[
     pw.TableRow(
-      decoration: const pw.BoxDecoration(color: _headerFill),
       repeat: true,
-      children: [for (final h in headers) _cell(h, bold: true, size: 5.5, align: pw.TextAlign.center)],
+      children: [
+        for (final (h, underline) in headers) _cell(h, underline: underline, size: 6.5, align: pw.TextAlign.center),
+      ],
     ),
   ];
   for (var i = 0; i < r.circuits.length; i++) {
@@ -420,43 +471,43 @@ List<pw.Widget> _fonksiyonTestleri(SiteProfile p, PanelReport r) {
       orDash(c.tdMs),
       '${result?.label ?? '-'}$note',
     ];
-    rows.add(pw.TableRow(children: [
-      for (var k = 0; k < values.length; k++)
-        _cell(values[k], size: _small, align: k == 1 || k == 13 ? pw.TextAlign.left : pw.TextAlign.center),
-    ]));
+    rows.add(pw.TableRow(children: [for (final v in values) _value(v, size: _fsSmall)]));
   }
 
   return [
-    _sectionTitle('6. FONKSİON KONTROL KRİTERLERİ VE TESTLER'),
-    ..._kvTable([
-      ['Ölçüm ve Doğrulama Metodu', choiceText(ReportTemplate.olcumMetodu, r.method)],
-    ]),
-    _subTitle(
-        'AŞIRI AKIM CİHAZI, İLETKEN UYGUNLUĞU, GERİLİM KONTROLÜ, AŞIRI GERİM CİHAZLARI (DKD) KONTROLÜ VE (ARTIK AKIM ANAHTARI) RCD TESTLERİ'),
-    ..._kvTable([
-      ['Pano (Ekipman) Adı-Etiketi veya Kodu', orDash(r.panelName)],
-      [
-        'Panodan ölçülen faz-nötr çevrim empedansı (ZLN) (Ω)',
-        orDash(r.zlnOhm),
-        'Panodan ölçülen faz-toprak çevrim empedansı (Zx) (Ω)',
-        orDash(r.zxOhm)
-      ],
-      ['Gerilimler F-F (V)', orDash(r.vff), 'Gerilimler L-N (V)', orDash(r.vln)],
-      ['Gerilimler N-PE (V)', orDash(r.vnpe), 'Hesaplanan 3 fazlı kısa devre akımı (Ik) (kA)', orDash(r.ikKa)],
-      [
-        'Aşırı gerilim koruma (DKD) tipi',
-        orDash(r.spdType),
-        'Aşırı gerilim koruma (DKD) dayanma akımı (kA)',
-        orDash(r.spdKa)
-      ],
-    ]),
-    pw.SizedBox(height: 3),
-    pw.Row(children: [
-      groupCell('', 0, 1),
-      groupCell('Aşırı Akım Koruma Cihazının', 2, 5),
-      groupCell('İletkenin', 6, 10),
-      groupCell('RCD Testi', 11, 12),
-      groupCell('', 13, 13),
+    _keep([
+      _sectionTitle('6. FONKSİON KONTROL KRİTERLERİ VE TESTLER'),
+      ..._kvTable([
+        ['Ölçüm ve Doğrulama Metodu', choiceText(ReportTemplate.olcumMetodu, r.method)],
+      ]),
+      _subTitle('AŞIRI AKIM CİHAZI, İLETKEN UYGUNLUĞU, GERİLİM KONTROLÜ, AŞIRI GERİM CİHAZLARI (DKD) KONTROLÜ VE '
+          '(ARTIK AKIM ANAHTARI) RCD TESTLERİ'),
+      ..._kvTable(labelBold: true, [
+        ['Pano (Ekipman) Adı-Etiketi veya Kodu', orDash(r.panelName)],
+      ]),
+      ..._kvTable([
+        [
+          'Panodan ölçülen faz-nötr çevrim empedansı (ZLN) (Ω)',
+          orDash(r.zlnOhm),
+          'Panodan ölçülen faz-toprak çevrim empedansı (Zx) (Ω)',
+          orDash(r.zxOhm)
+        ],
+        ['Gerilimler F-F (V)', orDash(r.vff), 'Gerilimler L-N (V)', orDash(r.vln)],
+        ['Gerilimler N-PE (V)', orDash(r.vnpe), 'Hesaplanan 3 fazlı kısa devre akımı (Ik) (kA)', orDash(r.ikKa)],
+        [
+          'Aşırı gerilim koruma (DKD) tipi',
+          orDash(r.spdType),
+          'Aşırı gerilim koruma (DKD) dayanma akımı (kA)',
+          orDash(r.spdKa)
+        ],
+      ]),
+      pw.Row(children: [
+        groupCell('', 0, 1),
+        groupCell('Aşırı Akım Koruma Cihazının', 2, 5),
+        groupCell('İletkenin', 6, 10),
+        groupCell('RCD Testi', 11, 12),
+        groupCell('', 13, 13),
+      ]),
     ]),
     pw.Table(
       border: pw.TableBorder.all(width: _border),
@@ -464,21 +515,21 @@ List<pw.Widget> _fonksiyonTestleri(SiteProfile p, PanelReport r) {
       defaultVerticalAlignment: pw.TableCellVerticalAlignment.middle,
       children: rows,
     ),
-    _subTitle('ZEMİN İZOLASYONUNUN KONTROLÜ'),
-    pw.Table(
-      border: pw.TableBorder.all(width: _border),
-      columnWidths: const {
-        0: pw.FlexColumnWidth(1),
-        1: pw.FlexColumnWidth(6),
-        2: pw.FlexColumnWidth(2),
-        3: pw.FlexColumnWidth(2),
-        4: pw.FlexColumnWidth(3),
-        5: pw.FlexColumnWidth(3),
-      },
-      children: [
-        pw.TableRow(
-          decoration: const pw.BoxDecoration(color: _labelFill),
-          children: [
+    _keep([
+      _subTitle('ZEMİN İZOLASYONUNUN KONTROLÜ'),
+      pw.Table(
+        border: pw.TableBorder.all(width: _border),
+        defaultVerticalAlignment: pw.TableCellVerticalAlignment.middle,
+        columnWidths: const {
+          0: pw.FlexColumnWidth(1),
+          1: pw.FlexColumnWidth(6),
+          2: pw.FlexColumnWidth(2),
+          3: pw.FlexColumnWidth(2),
+          4: pw.FlexColumnWidth(3),
+          5: pw.FlexColumnWidth(3),
+        },
+        children: [
+          pw.TableRow(children: [
             for (final h in [
               'No.',
               'İzolasyon halısının (zemin yalıtımının) yeri',
@@ -487,36 +538,36 @@ List<pw.Widget> _fonksiyonTestleri(SiteProfile p, PanelReport r) {
               'Zemin izolasyon direnci (kΩ)',
               'Sonuç (Uygunluk notu)',
             ])
-              _cell(h, bold: true, size: _small, align: pw.TextAlign.center),
-          ],
-        ),
-        for (var i = 0; i < r.floorInsulations.length; i++)
-          pw.TableRow(children: [
-            _cell('${i + 1}.', size: _small, align: pw.TextAlign.center),
-            _cell(orDash(r.floorInsulations[i].location), size: _small),
-            _cell(orDash(r.floorInsulations[i].widthM), size: _small, align: pw.TextAlign.center),
-            _cell(orDash(r.floorInsulations[i].lengthM), size: _small, align: pw.TextAlign.center),
-            _cell(orDash(r.floorInsulations[i].resistanceKohm), size: _small, align: pw.TextAlign.center),
-            _cell(floorResult(r.floorInsulations[i], p)?.label ?? '-', size: _small, align: pw.TextAlign.center),
+              _cell(h, underline: true, align: pw.TextAlign.center),
           ]),
-      ],
-    ),
+          for (var i = 0; i < r.floorInsulations.length; i++)
+            pw.TableRow(children: [
+              _value('${i + 1}.'),
+              _value(orDash(r.floorInsulations[i].location)),
+              _value(orDash(r.floorInsulations[i].widthM)),
+              _value(orDash(r.floorInsulations[i].lengthM)),
+              _value(orDash(r.floorInsulations[i].resistanceKohm)),
+              _value(floorResult(r.floorInsulations[i], p)?.label ?? '-'),
+            ]),
+        ],
+      ),
+    ]),
   ];
 }
 
 pw.Widget _photos(PanelReport r, pw.MemoryImage? equipment, pw.MemoryImage? thermal) {
   // Fotoğraf yoksa alan küçülür; rapor boş kutular yüzünden sayfa kaybetmez.
-  final height = equipment == null && thermal == null ? 40.0 : 210.0;
+  final height = equipment == null && thermal == null ? 30.0 : 210.0;
   pw.Widget slot(String caption, pw.MemoryImage? img) => pw.Expanded(
         child: pw.Container(
           decoration: pw.BoxDecoration(border: pw.Border.all(width: _border)),
           child: pw.Column(children: [
-            _cell(caption, bold: true, align: pw.TextAlign.center),
+            _cell(caption, underline: true, align: pw.TextAlign.center),
             pw.Container(
               height: height,
               padding: const pw.EdgeInsets.all(3),
               alignment: pw.Alignment.center,
-              child: img == null ? pw.Text('-') : pw.Image(img, fit: pw.BoxFit.contain),
+              child: img == null ? null : pw.Image(img, fit: pw.BoxFit.contain),
             ),
           ]),
         ),
@@ -527,31 +578,101 @@ pw.Widget _photos(PanelReport r, pw.MemoryImage? equipment, pw.MemoryImage? ther
   ]);
 }
 
-List<pw.Widget> _yetkili(SiteProfile p) => [
-      _keep([
-        _sectionTitle('11. PERİYODİK KONTROLLLERİ YAPMAYA YETKİLİ KİŞİ BİLGİLERİ VE ONAY'),
-        pw.Container(
-          decoration: pw.BoxDecoration(border: pw.Border.all(width: _border)),
-          child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-            pw.Expanded(
-              flex: 2,
-              child: pw.Column(
-                  children: _kvTable([
-                ['Adı Soyadı', orDash(p.inspectorName)],
-                ['Mesleği', orDash(p.inspectorProfession)],
-                ['Diploma Numarası', orDash(p.inspectorDiplomaNo)],
-                ['Ekipnet Kayıt Numarası', orDash(p.inspectorEkipnetNo)],
-              ])),
-            ),
-            pw.Expanded(
-              child: pw.Column(children: [
-                _cell('İmzası', bold: true, fill: true, align: pw.TextAlign.center),
-                pw.SizedBox(height: 50),
-              ]),
-            ),
-          ]),
+/// 10. bölüm: biçimli sonuç cümlesi ve Word'deki satır düzeniyle ağır kusur tanımları.
+List<pw.Widget> _sonuc(PanelReport r, bool uygun) {
+  final sentence = pw.RichText(
+    textAlign: pw.TextAlign.justify,
+    text: pw.TextSpan(children: [
+      for (final (text, bold, italic) in ReportTemplate.sonucParcalari(
+        uygun: uygun,
+        sonrakiTarih: formatDate(r.nextDate),
+      ))
+        pw.TextSpan(
+          text: text,
+          style: pw.TextStyle(
+            fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
+            fontStyle: italic ? pw.FontStyle.italic : pw.FontStyle.normal,
+          ),
         ),
-        pw.SizedBox(height: 4),
-        pw.Text(ReportTemplate.nushaMetni, style: const pw.TextStyle(fontSize: _small)),
+    ]),
+  );
+
+  final numbered = RegExp(r'^(\d+\.)\s');
+  pw.Widget line(String s) {
+    if (s.isEmpty) return pw.SizedBox(height: 5);
+    if (s.startsWith('#')) {
+      return pw.Text(s.substring(1), style: const pw.TextStyle(fontWeight: pw.FontWeight.bold));
+    }
+    final m = numbered.firstMatch(s);
+    if (m == null) return pw.Text(s);
+    return pw.RichText(
+      text: pw.TextSpan(children: [
+        pw.TextSpan(text: m.group(1), style: const pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+        pw.TextSpan(text: s.substring(m.group(1)!.length)),
       ]),
-    ];
+    );
+  }
+
+  // Başlık ve sonuç cümlesi birlikte kalır; uzun ağır kusur listesi ise sayfa sonunda satır satır
+  // bölünebilir (aksi halde bölüm bütünüyle sonraki sayfaya atlar ve yarım sayfa boş kalır).
+  const sides = pw.BorderSide(width: _border);
+  pw.TableRow listRow(pw.Widget child) => pw.TableRow(children: [
+        pw.Padding(padding: const pw.EdgeInsets.symmetric(horizontal: 3), child: child),
+      ]);
+  return [
+    _keep([
+      _sectionTitle('10. SONUÇ VE KANAAT'),
+      pw.Container(
+        padding: const pw.EdgeInsets.fromLTRB(3, 2, 3, 6),
+        decoration: const pw.BoxDecoration(border: pw.Border(left: sides, right: sides)),
+        child: sentence,
+      ),
+    ]),
+    pw.Table(
+      border: const pw.TableBorder(left: sides, right: sides, bottom: sides),
+      children: [
+        for (final s in ReportTemplate.agirKusurTanimlari) listRow(line(s)),
+        listRow(pw.SizedBox(height: 2)),
+      ],
+    ),
+  ];
+}
+
+List<pw.Widget> _yetkili(SiteProfile p) {
+  pw.TableRow row(String label, String value) => pw.TableRow(children: [
+        _cell(label, bold: true),
+        _cell(orDash(value), align: pw.TextAlign.center),
+      ]);
+  return [
+    _keep([
+      _sectionTitle('11. PERİYODİK KONTROLLLERİ YAPMAYA YETKİLİ KİŞİ BİLGİLERİ VE ONAY'),
+      pw.Container(
+        decoration: pw.BoxDecoration(border: pw.Border.all(width: _border)),
+        child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+          pw.Expanded(
+            flex: 7,
+            child: pw.Table(
+              border: const pw.TableBorder(
+                right: pw.BorderSide(width: _border),
+                horizontalInside: pw.BorderSide(width: _border),
+                verticalInside: pw.BorderSide(width: _border),
+              ),
+              columnWidths: const {0: pw.FlexColumnWidth(2), 1: pw.FlexColumnWidth(5)},
+              children: [
+                row('Adı Soyadı', p.inspectorName),
+                row('Mesleği', p.inspectorProfession),
+                row('Diploma Numarası', p.inspectorDiplomaNo),
+                row('Ekipnet Kayıt Numarası', p.inspectorEkipnetNo),
+              ],
+            ),
+          ),
+          pw.Expanded(
+            flex: 3,
+            child: _cell('İmzası', bold: true, underline: true, align: pw.TextAlign.center),
+          ),
+        ]),
+      ),
+      _box(pw.Text(ReportTemplate.nushaMetni)),
+    ]),
+  ];
+}

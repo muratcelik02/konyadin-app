@@ -196,38 +196,59 @@ class ReportTemplate {
       'ölçümü ile tespit edilmiştir.';
 
   // ---- 10. SONUÇ VE KANAAT ----
-  static String sonucMetni({required bool uygun, required String sonrakiTarih}) =>
-      'Periyodik kontrol tarihi itibari ile yukarıda teknik özellikleri belirtilen ELEKTRİK TESİSATI’nın GÖZLE '
-      'KONTROL VE FONKSİYON TESTLERİ muayenesi sonrasında mevcut şartlar altında kullanımı '
-      '${uygun ? 'UYGUNDUR' : 'UYGUN DEĞİLDİR'}. Normal şartlarda bir sonraki periyodik kontrol tarihi '
-      '$sonrakiTarih’dir.';
+  /// Sonuç cümlesi biçimli parçalar halinde: (metin, kalın, eğik). Word şablonundaki gibi tesisat adı
+  /// kalın-eğik, karar kalın basılır.
+  static List<(String, bool, bool)> sonucParcalari({required bool uygun, required String sonrakiTarih}) => [
+        ('Periyodik kontrol tarihi itibari ile yukarıda teknik özellikleri belirtilen ', false, false),
+        ('ELEKTRİK TESİSATI', true, true),
+        ('’nın ', false, false),
+        ('GÖZLE KONTROL VE FONKSİYON TESTLERİ', true, true),
+        (' muayenesi sonrasında mevcut şartlar altında kullanımı ', false, false),
+        (uygun ? 'UYGUNDUR.' : 'UYGUN DEĞİLDİR.', true, false),
+        (' Normal şartlarda bir sonraki periyodik kontrol tarihi $sonrakiTarih’dir.', false, false),
+      ];
 
-  static const String agirKusurTanimlari =
-      'Ağır kusur tanımları: Gözle Kontrol Bölümü 1. Faza erişim engeli IP2X koruma sınıfını sağlamıyorsa, 2. '
-      'Kablo ek noktaları yalıtımlı değilse, pano içinde ucu açıkta iletken varsa, 3. Pano elemanları bağlantı '
-      'noktalarında kontak gevşekliği (seri ark) tespit edilmişse, 4. PVC izoleli kablolarda ve pano '
-      'elemanlarının dokunulabilen metal olmayan yüzeylerinde aşırı ısınma tespit edilmişse. Fonksiyon Testleri '
-      'Bölümü 1. Hesaplanan 3 fazlı kısa devre akımı, pano içinde bulunan herhangi bir aşırı akım koruma cihazı '
-      'etiketinde yazan kısa devre kesme kapasitesinden (Icu) fazla ise, 2. Aşırı akım koruma elemanı değerleri '
-      'linye kesiti ile uyumsuz ise, 3. El ulaşma mesafesindeki metal bölümler, ekipmanın toprak barası veya '
-      'toprak ucuyla eş potansiyel değilse, 4. AAA performans testi sonuçları yetersiz ise, 5. Kablo şalter '
-      'koordinasyonunun aşağıdaki uygunsuzluğu; Devre Tasarım Akımı (Ib), Devre Kesici Akımı (In) ve Kablo Akım '
-      'Taşıma Kapasitesi (Iz) için Ib<In<Iz sağlanmadıysa, 6. Zemin yalıtımının aşağıdaki uygunsuzlukları; a) El '
-      'ulaşma mesafesinde bulunan zemin izolasyonu uygun boyutta değilse, (EİTY Md. 33d) b) Zemin izolasyon '
-      'direnci 50 kΩ’dan büyük değilse, (EİTY Md. 48) 7. N/PEN iletkeni kesitinin ve kullanım yerinin aşağıdaki '
-      'uygunsuzlukları; a) N/PEN kesiti ile faz iletkeni kesiti eşit değilse. (EİTY Md 57b3-ii-1) İstisna: N/PEN '
-      'kesitinin faz iletkeninin kesitinden küçük olması durumunda (örneğin 3x70+35 mm2 gibi) faz iletkenlerini '
-      'koruyan devre kesici anma akımının ve N/PEN iletkeni kesitine göre (örnekteki 35mm2’ye göre) belirlenmesi '
-      'kuralı ihlal edildiyse, (EİTY Md 57b3-ii-2) b) PEN iletkeni kesiti >10 mm2 değilse, (EİTY Md 36) c) PEN '
-      'iletkeni yangın tehlikesi olan yerlerden geçirilmemesi kuralı ihlal edildiyse, (EİTY Md 64) d) PEN '
-      'iletkeni Exproof tehlikeli bölge sınırları içinden geçirilmemesi kuralı ihlal edildiyse, (IEC 60079-14) 8. '
-      'PE koruma iletkeni kesitinin aşağıdaki uygunsuzluğu; Koruma iletkeni kesiti ETTY Md. 9e1i’de verilen '
-      'formülle yapılan hesap sonucuna ve ETTY Çizelge 8’de verilen tabloya uygun değilse, 9. PD potansiyel '
-      'dengeleme iletkeni kesitinin aşağıdaki uygunsuzluğu; 6 mm2 ≤ PD ≤ 25 mm2 değilse, 10. Tamamlayıcı '
-      'potansiyel dengeleme: PD ≥ 4mm² değilse. Ağır kusur olarak değerlendirilir. TS HD 60364 standardına göre '
-      'kullanımı uygun olmayan tesisatlar aşağıdaki şekilde işaretlenir: C1 - Tehlike mevcut. Yaralanma riski. '
-      'Derhal düzeltici eylem gerekli. C2 - Potansiyel olarak tehlikeli - acil düzeltici eylem gerekli. C3 - '
-      'İyileştirme önerilir. Bu rapor “Alçak Gerilim Topraklama Tesisatı Kontrol Raporu” ile birlikte geçerlidir.';
+  /// Ağır kusur tanımları, Word şablonundaki satır düzeniyle. "#" ile başlayan satır kalın başlıktır,
+  /// boş satır paragraf aralığıdır; "1." gibi madde numaraları PDF'te kalın basılır.
+  static const List<String> agirKusurTanimlari = [
+    '#Ağır kusur tanımları:',
+    '#Gözle Kontrol Bölümü',
+    '1. Faza erişim engeli IP2X koruma sınıfını sağlamıyorsa,',
+    '2. Kablo ek noktaları yalıtımlı değilse, pano içinde ucu açıkta iletken varsa,',
+    '3. Pano elemanları bağlantı noktalarında kontak gevşekliği (seri ark) tespit edilmişse,',
+    '4. PVC izoleli kablolarda ve pano elemanlarının dokunulabilen metal olmayan yüzeylerinde aşırı ısınma tespit edilmişse.',
+    '',
+    '#Fonksiyon Testleri Bölümü',
+    '1. Hesaplanan 3 fazlı kısa devre akımı, pano içinde bulunan herhangi bir aşırı akım koruma cihazı etiketinde yazan '
+        'kısa devre kesme kapasitesinden (Icu) fazla ise,',
+    '2. Aşırı akım koruma elemanı değerleri linye kesiti ile uyumsuz ise,',
+    '3. El ulaşma mesafesindeki metal bölümler, ekipmanın toprak barası veya toprak ucuyla eş potansiyel değilse,',
+    '4. AAA performans testi sonuçları yetersiz ise,',
+    '5. Kablo şalter koordinasyonunun aşağıdaki uygunsuzluğu; Devre Tasarım Akımı (Ib), Devre Kesici Akımı (In) ve '
+        'Kablo Akım Taşıma Kapasitesi (Iz) için Ib<In<Iz sağlanmadıysa,',
+    '6. Zemin yalıtımının aşağıdaki uygunsuzlukları;',
+    'a) El ulaşma mesafesinde bulunan zemin izolasyonu uygun boyutta değilse, (EİTY Md. 33d)',
+    'b) Zemin izolasyon direnci 50 kΩ’dan büyük değilse, (EİTY Md. 48)',
+    '7. N/PEN iletkeni kesitinin ve kullanım yerinin aşağıdaki uygunsuzlukları;',
+    'a) N/PEN kesiti ile faz iletkeni kesiti eşit değilse. (EİTY Md 57b3-ii-1) İstisna: N/PEN kesitinin faz '
+        'iletkeninin kesitinden küçük olması durumunda (örneğin 3x70+35 mm² gibi) faz iletkenlerini koruyan devre '
+        'kesici anma akımının ve N/PEN iletkeni kesitine göre (örnekteki 35mm²’ye göre) belirlenmesi kuralı ihlal '
+        'edildiyse, (EİTY Md 57b3-ii-2)',
+    'b) PEN iletkeni kesiti >10 mm² değilse, (EİTY Md 36)',
+    'c) PEN iletkeni yangın tehlikesi olan yerlerden geçirilmemesi kuralı ihlal edildiyse, (EİTY Md 64)',
+    'd) PEN iletkeni Exproof tehlikeli bölge sınırları içinden geçirilmemesi kuralı ihlal edildiyse, (IEC 60079-14)',
+    '8. PE koruma iletkeni kesitinin aşağıdaki uygunsuzluğu; Koruma iletkeni kesiti ETTY Md. 9e1i’de verilen '
+        'formülle yapılan hesap sonucuna ve ETTY Çizelge 8’de verilen tabloya uygun değilse,',
+    '9. PD potansiyel dengeleme iletkeni kesitinin aşağıdaki uygunsuzluğu; 6 mm2 ≤ PD ≤ 25 mm² değilse,',
+    '10. Tamamlayıcı potansiyel dengeleme: PD ≥ 4mm² değilse.',
+    'Ağır kusur olarak değerlendirilir.',
+    '',
+    'TS HD 60364 standardına göre kullanımı uygun olmayan tesisatlar aşağıdaki şekilde işaretlenir:',
+    'C1 - Tehlike mevcut. Yaralanma riski. Derhal düzeltici eylem gerekli.',
+    'C2 - Potansiyel olarak tehlikeli - acil düzeltici eylem gerekli.',
+    'C3 - İyileştirme önerilir.',
+    'Bu rapor “Alçak Gerilim Topraklama Tesisatı Kontrol Raporu” ile birlikte geçerlidir.',
+  ];
 
   /// Görev ayarlarında kontrol firması boş bırakılırsa altbilgide kullanılır (Word şablonundaki firma).
   static const String defaultKontrolFirmasiEkli = 'DİNAMİK MÜHENDİSLİK’in';
