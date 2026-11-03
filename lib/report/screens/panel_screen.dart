@@ -86,6 +86,41 @@ class _PanelScreenState extends State<PanelScreen> with AutoSave {
     changed();
   }
 
+  /// Kriterleri UYGUN yapar. Teknisyenin bilerek UYGUN DEĞİL / UYGULANAMAZ işaretledikleri
+  /// sessizce ezilmesin diye önce sorulur.
+  Future<void> _markAllUygun(List<CriterionDef> items) async {
+    final others = items.where((c) {
+      final e = r.criteria[c.id];
+      return e != null && e != Evaluation.uygun;
+    }).toList();
+    var overwrite = false;
+    if (others.isNotEmpty) {
+      final choice = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Farklı işaretli kriterler var'),
+          content: Text('${others.length} kriter UYGUN DEĞİL veya UYGULANAMAZ işaretli:\n\n'
+              '${others.map((c) => '• ${c.label} (${r.criteria[c.id]!.label})').join('\n')}'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Vazgeç')),
+            TextButton(onPressed: () => Navigator.pop(ctx, 'all'), child: const Text('Hepsini UYGUN yap')),
+            TextButton(onPressed: () => Navigator.pop(ctx, 'empty'), child: const Text('Onlara dokunma')),
+          ],
+        ),
+      );
+      if (choice == null) return;
+      overwrite = choice == 'all';
+    }
+    for (final c in items) {
+      if (overwrite) {
+        r.criteria[c.id] = Evaluation.uygun;
+      } else {
+        r.criteria.putIfAbsent(c.id, () => Evaluation.uygun);
+      }
+    }
+    changed();
+  }
+
   Future<void> _openCircuit(int? index) async {
     await Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => CircuitScreen(store: store, job: job, report: r, index: index),
@@ -180,24 +215,32 @@ class _PanelScreenState extends State<PanelScreen> with AutoSave {
             title: '5. Kontrol Kriterleri',
             subtitle: '$evaluated / $total değerlendirildi',
             children: [
-              if (evaluated < total)
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton.icon(
-                    icon: const Icon(Icons.done_all),
-                    label: const Text('Boş kalanları UYGUN işaretle'),
-                    onPressed: () {
-                      for (final c in ReportTemplate.allCriteria) {
-                        r.criteria.putIfAbsent(c.id, () => Evaluation.uygun);
-                      }
-                      changed();
-                    },
-                  ),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.done_all),
+                label: const Text('Tümünü UYGUN yap'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF10B981),
+                  minimumSize: const Size.fromHeight(46),
                 ),
+                onPressed: () => _markAllUygun(ReportTemplate.allCriteria),
+              ),
+              const SizedBox(height: 4),
               for (final g in ReportTemplate.criteriaGroups) ...[
                 Padding(
                   padding: const EdgeInsets.only(top: 8, bottom: 4),
-                  child: Text(g.title, style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF1E5BB0))),
+                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(g.title,
+                            style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF1E5BB0))),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => _markAllUygun(g.items),
+                      child: const Text('Grubu UYGUN', style: TextStyle(fontSize: 12)),
+                    ),
+                  ]),
                 ),
                 for (final c in g.items)
                   Padding(

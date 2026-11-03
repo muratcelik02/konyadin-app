@@ -80,6 +80,13 @@ class _CircuitScreenState extends State<CircuitScreen> with AutoSave {
   }
 
   Future<void> _next() async {
+    // Boş devreden "sonraki"ye geçilirse tabloda isimsiz boş satırlar birikir.
+    if (!isFilled(c.name) && !isFilled(c.ibA)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Önce bu devrenin adını veya Ib ölçümünü girin.')),
+      );
+      return;
+    }
     await saveNow();
     setState(() {
       _appendNew();
